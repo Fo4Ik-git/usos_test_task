@@ -35,7 +35,8 @@ public class Menu {
                     showMenu();
                     break;
                 case 2:
-                    processData();
+                    DataProcessor dataProcessor = new DataProcessor();
+                    dataProcessor.processData();
                     showMenu();
                     break;
                 case 0:
@@ -47,58 +48,5 @@ public class Menu {
             }
     }
 
-    private void processData() {
-        // Load data from JSON file
-        List<Map<String, String>> subjects;
-        ObjectMapper mapper = new ObjectMapper();
-        try {
-            subjects = mapper.readValue(new File("data.json"), new TypeReference<>() {});
-        } catch (Exception e) {
-            System.err.println("Error reading JSON file: " + e.getMessage());
-            return;
-        }
 
-        // Executor for parallel processing
-        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-
-        try {
-            List<Future<Map.Entry<String, Integer>>> futures = new ArrayList<>();
-
-            for (Map<String, String> subject : subjects) {
-                String subjectName = subject.get("nazwaPrzedmiotu");
-                String instructorName = subject.get("prowadzacyGrup");
-
-                futures.add(executor.submit(() -> {
-                    Map<Character, Integer> commonCounts = DataProcessor.commonLetters(subjectName, instructorName);
-                    int totalCommonCount = commonCounts.values().stream().mapToInt(Integer::intValue).sum();
-                    return Map.entry(subjectName + " | " + instructorName, totalCommonCount);
-                }));
-            }
-
-            List<Map.Entry<String, Integer>> rankedSubjects = futures.stream()
-                    .map(future -> {
-                        try {
-                            return future.get();
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    })
-                    .sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue()))
-                    .collect(Collectors.toList());
-
-            // Print the top 10 subjects
-            System.out.println("Top 10 subjects with the most common letters:");
-            rankedSubjects.stream().limit(10).forEach(entry -> {
-                String[] parts = entry.getKey().split(" \\| ");
-                String subjectName = parts[0];
-                String instructorName = parts[1];
-                System.out.println("Name of Subject: " + subjectName);
-                System.out.println("Names: " + instructorName);
-                System.out.println("Total Common Letters: " + entry.getValue());
-                System.out.println("------------");
-            });
-        } finally {
-            executor.shutdown();
-        }
-    }
 }
